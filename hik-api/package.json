@@ -10,6 +10,8 @@
     "zod": "^4.6.4"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^26.5.1",
+    "drizzle-kit": "^0.31.10"
   }
 }
