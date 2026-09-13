@@ -1,9 +1,20 @@
-import { Hono } from 'hono'
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import ChatRoute from "./routes/chat";
 
-const app = new Hono()
+const app = new Hono();
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+// middleware
+app.use("*", logger());
+app.use("*", cors());
 
-export default app
+// Health check
+app.get("/", (c) => {
+  return c.text("Hik API is running!");
+});
+
+// Mount routes
+app.route("/api/v1/chat", ChatRoute);
+
+export default app;
