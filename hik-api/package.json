@@ -4,6 +4,9 @@
     "dev": "bun run --hot src/index.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.53",
+    "@ai-sdk/openai": "^4.0.66",
+    "ai": "^7.0.99",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.7",
     "postgres": "^3.4.9",
