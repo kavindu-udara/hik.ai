@@ -22,3 +22,5 @@ Here is your step-by-step checklist to get the backend running:
 - [ ] Step 4: Save to Database & Track Usage
     - While the stream is finishing, save the final full prompt and response to the messages table.
     - Extract the usage: { prompt_tokens, completion_tokens } from the LLM response and insert it into the usage_logs table.
+
+

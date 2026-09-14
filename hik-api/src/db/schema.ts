@@ -1,10 +1,11 @@
-import { pgTable, uuid, text, timestamp, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, integer, boolean } from 'drizzle-orm/pg-core'; 
+import { sql } from 'drizzle-orm'; 
 
 export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: uuid('id').default(sql`gen_random_uuid()`).primaryKey(), 
   email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(), // In production, use bcrypt/argon2
-  plan: text('plan').default('free').notNull(), // 'free' (BYOK) or 'full' (Hik provides keys)
+  passwordHash: text('password_hash').notNull(),
+  plan: text('plan').default('free').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
