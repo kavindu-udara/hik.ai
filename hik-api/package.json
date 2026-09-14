@@ -9,8 +9,9 @@
     "ai": "^7.0.99",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.7",
+    "jose": "^6.2.12",
     "postgres": "^3.4.9",
-    "zod": "^4.6.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "latest",
