@@ -1,7 +1,4 @@
-curl -X POST http://localhost:3000/api/v1/chat \
-     -H "Content-Type: application/json" \
-     -d '{
-       "sessionId": "123e4567-e89b-12d3-a456-426614174000",
-       "messages": [{"role": "user", "content": "Write a haiku about TypeScript"}],
-       "model": "gpt-4o-mini"
-     }'
+curl -X POST http://localhost:3000/api/v1/api-keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJmNGVmNTJlOC0wOGNhLTQ0ZGYtODdlNi0xZTY5MTJlNGQyNWQiLCJleHAiOjE3OTAwMTc5ODV9.33grjYt_oqA3BLhi9KYIS2-2hDpC4XFhlVm6344ug9k" \
+  -d '{"name": "Obsidian Plugin"}'
