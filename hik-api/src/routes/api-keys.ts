@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { generateApiKey, hashPassword, verifyJWT } from "../lib/auth";
+import { generateApiKey, hashApiKey, verifyJWT } from "../lib/auth";
 import z from "zod";
 import { db } from "../db";
 import { apiKeys } from "../db/schema";
@@ -44,7 +44,7 @@ apiKeyRoute.post("/", async (c) => {
   const rawApiKey = generateApiKey();
 
   // Hash the API key before save it to the database
-  const keyHash = await hashPassword(rawApiKey);
+  const keyHash = await hashApiKey(rawApiKey);
 
   // Save to database
   const [newKey] = await db
