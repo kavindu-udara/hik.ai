@@ -1,5 +1,5 @@
 import { jwtVerify, SignJWT } from "jose";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
 const secretKey = new TextEncoder().encode(JWT_SECRET);
@@ -38,4 +38,8 @@ export const generateApiKey = () => {
 
 export const verifyApiKey = async (rawKey: string, hash: string) => {
   return await Bun.password.verify(rawKey, hash, 'bcrypt');
+};
+
+export const hashApiKey = (key: string) => {
+  return createHash('sha256').update(key).digest('hex');
 };

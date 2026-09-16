@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { generateApiKey, hashPassword, verifyJWT } from "../lib/auth";
+import { generateApiKey, hashApiKey, verifyJWT } from "../lib/auth";
 import z from "zod";
 import { db } from "../db";
 import { apiKeys } from "../db/schema";
@@ -36,7 +36,7 @@ apiKeyRoute.post("/", async (c) => {
   const body = await c.req.json();
   const parsed = generateKeySchema.safeParse(body);
 
-  if (!parsed.success) return c.json({ error: parsed.error.errors }, 400);
+  if (!parsed.success) return c.json({ error: parsed.error.format() }, 400);
 
   const { name } = parsed.data;
 
@@ -44,7 +44,7 @@ apiKeyRoute.post("/", async (c) => {
   const rawApiKey = generateApiKey();
 
   // Hash the API key before save it to the database
-  const keyHash = await hashPassword(rawApiKey);
+  const keyHash = await hashApiKey(rawApiKey);
 
   // Save to database
   const [newKey] = await db
