@@ -4,6 +4,10 @@ import { streamText } from "ai";
 import { Hono } from "hono";
 import { stream, streamSSE } from "hono/streaming";
 import z from "zod";
+import { hashPassword } from "../lib/auth";
+import { db } from "../db";
+import { and, eq } from "drizzle-orm";
+import { apiKeys, sessions, userProviderKeys } from "../db/schema";
 
 const ChatRoute = new Hono();
 
@@ -19,6 +23,30 @@ const chatSchema = z.object({
 });
 
 ChatRoute.post("/", async (c) => {
+  // Authenticate via API key
+  const apiKeyHeader =
+    c.req.header("x-api-key") ||
+    c.req.header("Authorization")?.replace("Bearer ", "");
+  if (!apiKeyHeader || !apiKeyHeader.startsWith("hik_")) {
+    return c.json({ error: "Unauthorized: Valid x-api-key required" }, 401);
+  }
+
+  // Hash the provided key to query the database
+  const hashedInput = await hashPassword(apiKeyHeader);
+
+  const dbKey = await db.query.apiKeys.findFirst({
+    where: eq(apiKeys.keyHash, hashedInput),
+    with: {user: true},
+  });
+
+  if(!dbKey){
+    return c.json({ error: 'Unauthorized: Invalid API key' }, 401);
+  }
+
+  const userId = dbKey.userId;
+  const userPlan = dbKey.user.plan;
+
+// Validate request body
   const body = await c.req.json();
   const parsed = chatSchema.safeParse(body);
 
@@ -26,62 +54,104 @@ ChatRoute.post("/", async (c) => {
     return c.json({ error: "Invalid request body" }, 400);
   }
 
-  const { messages, model } = parsed.data;
+  const { sessionId, messages: chatMessages, model } = parsed.data;
 
-  // TODO: 1. Verify the user's API key from the Authorization header
-  // TODO: 2. Fetch the user's profile to check their plan (Free vs Full)
-  // TODO: 3. If Free plan, fetch their BYOK key from userProviderKeys table.
-  //         If Full plan, use Hik's master environment variables.
-
-  // --- MOCKING THE KEY LOGIC FOR NOW ---
-  const isFullPlan = false;
-  const userOpenAIKey = process.env.OPENAI_API_KEY; // Fallback for testing
-  const userAnthropicKey = process.env.ANTHROPIC_API_KEY;
-  // -------------------------------------
-
-  // Dynamically create the provider based on the model requested
-  let provider;
-  if (model.startsWith("gpt") || model.startsWith("o1")) {
-    provider = createOpenAI({ apiKey: userOpenAIKey });
-  } else if (model.startsWith("claude")) {
-    provider = createAnthropic({ apiKey: userAnthropicKey });
-  } else {
-    return c.json({ error: "Unsupported model" }, 400);
-  }
-
-  //   Use Versel AI SDK to handle the streaming
-  const result = streamText({
-    model: provider(model),
-    messages: messages as any,
+  // Ensure session exists (or create it if it's the first message)
+  const session = await db.query.sessions.findFirst({
+    where: eq(sessions.id: sessionId)
   });
 
-  // Hono's SSE streaming helper to pipe the AI response to the client
+  if (!session) {
+    await db.insert(sessions).values({ id: sessionId, userId, title: chatMessages[0].content.slice(0, 30) + '...' });
+  }
+
+  // determine which API key to use (Full Plan vs BYOK)
+  let providerKey : string | undefined;
+  let providerName : 'openai' | 'anthropic' = 'openai';
+
+  if(userPlan === 'full'){
+    // Use master key from .env
+    if(model.startsWith('gpt') || model.startsWith('o1')){
+      providerKey = process.env.OPENAI_API_KEY;
+    }else if(model.startsWith('claude')){
+      providerKey = process.env.ANTHROPIC_API_KEY;
+      providerName = 'anthropic';
+    }
+  }else{
+    // BYOK : Fetch the user's saved key
+    const userKey = await db.query.userProviderKeys.findFirst({
+      where: and(eq(userProviderKeys.userId, userId), eq(userProviderKeys.provider, model.startsWith('claude') ? 'anthropic' : 'openai')),
+    });
+
+    if(!userKey){
+      return c.json({ error: 'Payment Required: Please add your API key in settings first.' }, 402);
+    }
+
+    providerKey = userKey.encryptedKey;
+    providerName = userKey.provider as 'openai' | 'anthropic';
+  }
+
+  if(!providerKey) {
+    return c.json({ error: 'Server Error: LLM provider key not configured' }, 500);
+  }
+
+  // Initialize the LLM provider 
+  const llmProvider = providerName === 'openai' ? createOpenAI({apiKey: providerKey}) : createAnthropic({apiKey: providerKey});
+
+  // Stream the response
+  const result = streamText({
+    model: llmProvider(model),
+    messages: chatMessages as any,
+  });
+
   return streamSSE(c, async (stream) => {
-    // Stream the text chunks
-    for await (const chunk of result.textStream) {
+    let fullResponseText = '';
+
+    // Stream chunks to client
+    for await (const chunk of result.textStream){
+      fullResponseText += chunk;
       await stream.writeSSE({
-        data: JSON.stringify({ type: "text", content: chunk }),
-        event: "message",
+        data: JSON.stringify({type: 'text', content: chunk}),
+        event: 'message',
       });
     }
 
-    // Once finished, get the usage metrics and send them
+    // Get final usage metrics
     const usage = await result.usage;
+
+    // Send completion event
     await stream.writeSSE({
-      data: JSON.stringify({
-        type: "done",
-        usage: {
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          totalTokens: usage.totalTokens,
-        },
+     data: JSON.stringify({ 
+        type: 'done', 
+        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
       }),
-      event: "message",
+      event: 'message',
     });
 
-    // TODO: Save the final message to the 'messages' table
-    // TODO: Save the usage metrics to the 'usage_logs' table
+    // Save to database
+    try {
+      // Save the assistant's message
+       await db.insert(messages).values({
+        sessionId,
+        role: 'assistant',
+        content: fullResponseText,
+      });
+
+       // Log usage metrics
+      await db.insert(usageLogs).values({
+        userId,
+        sessionId,
+        provider: providerName,
+        model,
+        inputTokens: usage.promptTokens,
+        outputTokens: usage.completionTokens,
+      });
+    } catch (dbError) {
+      console.error('Failed to save chat history or usage:', dbError);
+    }
+
   });
+
 });
 
 export default ChatRoute;
