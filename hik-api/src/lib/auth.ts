@@ -35,3 +35,7 @@ export const generateApiKey = () => {
   // generate a key like hik_ + 32 random bytes in hex
   return `hik_${randomBytes(32).toString("hex")}`;
 };
+
+export const verifyApiKey = async (rawKey: string, hash: string) => {
+  return await Bun.password.verify(rawKey, hash, 'bcrypt');
+};
