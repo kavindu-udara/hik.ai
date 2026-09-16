@@ -21,7 +21,7 @@ const loginSchema = z.object({
 authRoute.post("/register", async (c) => {
   const body = await c.req.json();
   const parsed = registerSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: parsed.error.errors }, 400);
+  if (!parsed.success) return c.json({ error: parsed.error.format() }, 400);
 
   const { email, password } = parsed.data;
 
@@ -61,7 +61,7 @@ authRoute.post("/register", async (c) => {
 authRoute.post("/login", async (c) => {
   const body = await c.req.json();
   const parsed = loginSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: parsed.error.errors }, 400);
+  if (!parsed.success) return c.json({ error: parsed.error.format() }, 400);
 
   const { email, password } = parsed.data;
 

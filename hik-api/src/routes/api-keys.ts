@@ -36,7 +36,7 @@ apiKeyRoute.post("/", async (c) => {
   const body = await c.req.json();
   const parsed = generateKeySchema.safeParse(body);
 
-  if (!parsed.success) return c.json({ error: parsed.error.errors }, 400);
+  if (!parsed.success) return c.json({ error: parsed.error.format() }, 400);
 
   const { name } = parsed.data;
 
