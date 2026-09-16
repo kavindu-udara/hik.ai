@@ -8,6 +8,7 @@ import { logger } from 'hono/logger';
 import authRoute from './routes/auth';
 import apiKeyRoute from './routes/api-keys';
 import settingsRoute from './routes/settings';
+import ChatRoute from './routes/chat';
 
 const app = new Hono();
 
@@ -21,5 +22,6 @@ app.get('/', (c) => {
 app.route('/api/v1/auth', authRoute);
 app.route('/api/v1/api-keys', apiKeyRoute);
 app.route('/api/v1/settings', settingsRoute);
+app.route('/api/v1/chat', ChatRoute);
 
 export default app;
