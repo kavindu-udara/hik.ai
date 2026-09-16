@@ -4,7 +4,7 @@ import { streamText } from "ai";
 import { Hono } from "hono";
 import { stream, streamSSE } from "hono/streaming";
 import { z } from "zod";
-import { hashPassword } from "../lib/auth";
+import { hashApiKey } from "../lib/auth";
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import { apiKeys, sessions, userProviderKeys, users } from "../db/schema";
@@ -27,12 +27,13 @@ ChatRoute.post("/", async (c) => {
   const apiKeyHeader =
     c.req.header("x-api-key") ||
     c.req.header("Authorization")?.replace("Bearer ", "");
+
   if (!apiKeyHeader || !apiKeyHeader.startsWith("hik_")) {
     return c.json({ error: "Unauthorized: Valid x-api-key required" }, 401);
   }
 
   // Hash the provided key to query the database
-  const hashedInput = await hashPassword(apiKeyHeader);
+  const hashedInput = await hashApiKey(apiKeyHeader);
 
   const dbKey = await db.query.apiKeys.findFirst({
     where: eq(apiKeys.keyHash, hashedInput),
