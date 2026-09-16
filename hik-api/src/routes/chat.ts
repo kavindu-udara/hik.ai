@@ -3,11 +3,11 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { Hono } from "hono";
 import { stream, streamSSE } from "hono/streaming";
-import z from "zod";
+import { z } from "zod";
 import { hashPassword } from "../lib/auth";
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
-import { apiKeys, sessions, userProviderKeys } from "../db/schema";
+import { apiKeys, sessions, userProviderKeys, users } from "../db/schema";
 
 const ChatRoute = new Hono();
 
@@ -36,17 +36,25 @@ ChatRoute.post("/", async (c) => {
 
   const dbKey = await db.query.apiKeys.findFirst({
     where: eq(apiKeys.keyHash, hashedInput),
-    with: {user: true},
   });
 
-  if(!dbKey){
-    return c.json({ error: 'Unauthorized: Invalid API key' }, 401);
+  if (!dbKey) {
+    return c.json({ error: "Unauthorized: Invalid API key" }, 401);
+  }
+
+  // Fetch the user separately
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, dbKey.userId),
+  });
+
+  if (!user) {
+    return c.json({ error: "Unauthorized: User not found" }, 401);
   }
 
   const userId = dbKey.userId;
-  const userPlan = dbKey.user.plan;
+  const userPlan = user.plan;
 
-// Validate request body
+  // Validate request body
   const body = await c.req.json();
   const parsed = chatSchema.safeParse(body);
 
@@ -58,45 +66,77 @@ ChatRoute.post("/", async (c) => {
 
   // Ensure session exists (or create it if it's the first message)
   const session = await db.query.sessions.findFirst({
-    where: eq(sessions.id: sessionId)
+    where: eq(sessions.id, sessionId),
   });
 
   if (!session) {
-    await db.insert(sessions).values({ id: sessionId, userId, title: chatMessages[0].content.slice(0, 30) + '...' });
+    await db.insert(sessions).values({
+      id: sessionId,
+      userId,
+      title: chatMessages[0].content.slice(0, 30) + "...",
+    });
   }
 
   // determine which API key to use (Full Plan vs BYOK)
-  let providerKey : string | undefined;
-  let providerName : 'openai' | 'anthropic' = 'openai';
+  let providerKey: string | undefined;
+  let providerName: "openai" | "anthropic" = "openai";
 
-  if(userPlan === 'full'){
+  if (userPlan === "full") {
     // Use master key from .env
-    if(model.startsWith('gpt') || model.startsWith('o1')){
+    if (model.startsWith("gpt") || model.startsWith("o1")) {
       providerKey = process.env.OPENAI_API_KEY;
-    }else if(model.startsWith('claude')){
+    } else if (model.startsWith("claude")) {
       providerKey = process.env.ANTHROPIC_API_KEY;
-      providerName = 'anthropic';
+      providerName = "anthropic";
     }
-  }else{
+  } else {
     // BYOK : Fetch the user's saved key
     const userKey = await db.query.userProviderKeys.findFirst({
-      where: and(eq(userProviderKeys.userId, userId), eq(userProviderKeys.provider, model.startsWith('claude') ? 'anthropic' : 'openai')),
+      where: and(
+        eq(userProviderKeys.userId, userId),
+        eq(
+          userProviderKeys.provider,
+          model.startsWith("claude") ? "anthropic" : "openai",
+        ),
+      ),
     });
 
-    if(!userKey){
-      return c.json({ error: 'Payment Required: Please add your API key in settings first.' }, 402);
+    if (!userKey) {
+      return c.json(
+        {
+          error: "Payment Required: Please add your API key in settings first.",
+        },
+        402,
+      );
     }
 
     providerKey = userKey.encryptedKey;
-    providerName = userKey.provider as 'openai' | 'anthropic';
+    providerName = userKey.provider as "openai" | "anthropic";
   }
 
-  if(!providerKey) {
-    return c.json({ error: 'Server Error: LLM provider key not configured' }, 500);
+  if (!providerKey) {
+    return c.json(
+      { error: "Server Error: LLM provider key not configured" },
+      500,
+    );
   }
 
-  // Initialize the LLM provider 
-  const llmProvider = providerName === 'openai' ? createOpenAI({apiKey: providerKey}) : createAnthropic({apiKey: providerKey});
+  // Initialize the LLM provider
+  let llmProvider;
+
+  if (providerName === "openai") {
+    llmProvider = createOpenAI({
+      apiKey: providerKey || "not-needed", // LM Studio doesn't need a key
+      baseURL: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+    });
+  } else if (providerName === "anthropic") {
+    llmProvider = createAnthropic({
+      apiKey: providerKey || "not-needed",
+      baseURL: process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+    });
+  } else {
+    return c.json({ error: "Unsupported provider" }, 400);
+  }
 
   // Stream the response
   const result = streamText({
@@ -105,14 +145,14 @@ ChatRoute.post("/", async (c) => {
   });
 
   return streamSSE(c, async (stream) => {
-    let fullResponseText = '';
+    let fullResponseText = "";
 
     // Stream chunks to client
-    for await (const chunk of result.textStream){
+    for await (const chunk of result.textStream) {
       fullResponseText += chunk;
       await stream.writeSSE({
-        data: JSON.stringify({type: 'text', content: chunk}),
-        event: 'message',
+        data: JSON.stringify({ type: "text", content: chunk }),
+        event: "message",
       });
     }
 
@@ -121,23 +161,26 @@ ChatRoute.post("/", async (c) => {
 
     // Send completion event
     await stream.writeSSE({
-     data: JSON.stringify({ 
-        type: 'done', 
-        usage: { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
+      data: JSON.stringify({
+        type: "done",
+        usage: {
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+        },
       }),
-      event: 'message',
+      event: "message",
     });
 
     // Save to database
     try {
       // Save the assistant's message
-       await db.insert(messages).values({
+      await db.insert(messages).values({
         sessionId,
-        role: 'assistant',
+        role: "assistant",
         content: fullResponseText,
       });
 
-       // Log usage metrics
+      // Log usage metrics
       await db.insert(usageLogs).values({
         userId,
         sessionId,
@@ -147,11 +190,9 @@ ChatRoute.post("/", async (c) => {
         outputTokens: usage.completionTokens,
       });
     } catch (dbError) {
-      console.error('Failed to save chat history or usage:', dbError);
+      console.error("Failed to save chat history or usage:", dbError);
     }
-
   });
-
 });
 
 export default ChatRoute;
