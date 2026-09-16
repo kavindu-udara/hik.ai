@@ -2,12 +2,19 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { Hono } from "hono";
-import { stream, streamSSE } from "hono/streaming";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { hashApiKey } from "../lib/auth";
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
-import { apiKeys, sessions, userProviderKeys, users } from "../db/schema";
+import {
+  apiKeys,
+  messages,
+  sessions,
+  usageLogs,
+  userProviderKeys,
+  users,
+} from "../db/schema";
 
 const ChatRoute = new Hono();
 
@@ -76,6 +83,20 @@ ChatRoute.post("/", async (c) => {
       userId,
       title: chatMessages[0].content.slice(0, 30) + "...",
     });
+    console.log("[DB] Created new session:", sessionId);
+  }
+
+  // Save the USER'S message to the database BEFORE streaming
+  try {
+    const lastUserMessage = chatMessages[chatMessages.length - 1];
+    await db.insert(messages).values({
+      sessionId,
+      role: lastUserMessage.role, // "user"
+      content: lastUserMessage.content,
+    });
+    console.log("[DB] Saved USER message to DB");
+  } catch (err) {
+    console.error("[ERROR] Failed to save user message:", err);
   }
 
   // determine which API key to use (Full Plan vs BYOK)
@@ -165,8 +186,8 @@ ChatRoute.post("/", async (c) => {
       data: JSON.stringify({
         type: "done",
         usage: {
-          promptTokens: usage.promptTokens,
-          completionTokens: usage.completionTokens,
+          promptTokens: usage?.inputTokens || 0,
+          completionTokens: usage?.outputTokens || 0,
         },
       }),
       event: "message",
@@ -174,12 +195,15 @@ ChatRoute.post("/", async (c) => {
 
     // Save to database
     try {
+      console.log("💾 Attempting to save assistant message and usage to DB...");
+
       // Save the assistant's message
       await db.insert(messages).values({
         sessionId,
         role: "assistant",
         content: fullResponseText,
       });
+      console.log("[DB] Saved ASSISTANT message to DB");
 
       // Log usage metrics
       await db.insert(usageLogs).values({
@@ -187,11 +211,12 @@ ChatRoute.post("/", async (c) => {
         sessionId,
         provider: providerName,
         model,
-        inputTokens: usage.promptTokens,
-        outputTokens: usage.completionTokens,
+        inputTokens: usage?.inputTokens || 0,
+        outputTokens: usage?.outputTokens || 0,
       });
+      console.log("[DB] Saved usage metrics to DB");
     } catch (dbError) {
-      console.error("Failed to save chat history or usage:", dbError);
+      console.error("[ERROR] FAILED TO SAVE TO DB:", dbError);
     }
   });
 });
