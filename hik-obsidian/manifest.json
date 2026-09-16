@@ -1,0 +1,11 @@
+{
+	"id": "hik-ai",
+	"name": "Hik AI",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Your unified AI workspace. Sync chats across Obsidian, Web, and CLI.",
+	"author": "Kavindu Udara",
+	"authorUrl": "https://github.com/kavindu-udara/hik.ai/",
+	"fundingUrl": "https://github.com/kavindu-udara/hik.ai/",
+	"isDesktopOnly": false
+}
