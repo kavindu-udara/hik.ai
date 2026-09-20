@@ -1,0 +1,46 @@
+name: Release Hik Obsidian Plugin
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on tags like v1.0.0 or plugin-v1.0.0
+    paths:
+      - "hik-obsidian/**"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: |
+          cd hik-obsidian
+          bun install
+
+      - name: Build plugin
+        run: |
+          cd hik-obsidian
+          bun run build
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          # Point to the files inside the hik-obsidian directory
+          files: |
+            hik-obsidian/main.js
+            hik-obsidian/manifest.json
+            hik-obsidian/styles.css
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
