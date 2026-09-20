@@ -1,15 +1,23 @@
-import { ItemView, WorkspaceLeaf, Notice, MarkdownView } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, MarkdownView, TFile } from 'obsidian';
 import HikPlugin from './main';
 import { streamChat, ChatMessage } from './api';
 import { v4 as uuidv4 } from 'uuid';
 
 export const VIEW_TYPE_HIK_CHAT = 'hik-chat-view';
 
+interface ContextFile {
+	file: TFile;
+	content: string;
+}
+
 export class HikChatView extends ItemView {
 	plugin: HikPlugin;
 	messages: ChatMessage[] = [];
 	sessionId: string = uuidv4();
 	isStreaming = false;
+	contextFiles: ContextFile[] = [];
+	contextProvidedFile: TFile | null = null;
+	lastActiveFile: TFile | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: HikPlugin) {
 		super(leaf);
@@ -27,13 +35,14 @@ export class HikChatView extends ItemView {
 	}
 
 	private chatHistoryEl!: HTMLElement;
+	private contextChipsEl!: HTMLElement;
 	private inputContainerEl!: HTMLElement;
 	private textareaEl!: HTMLTextAreaElement;
 	private sendBtnEl!: HTMLButtonElement;
 	private addContextBtnEl!: HTMLButtonElement;
-
-	private currentAssistantMsgEl!: HTMLElement;
 	private currentAssistantTextEl!: HTMLElement;
+	private currentAssistantMsgEl!: HTMLElement;
+	private insertBtnsContainerEl!: HTMLElement;
 	private lastAssistantResponse: string = '';
 
 	async onOpen() {
@@ -41,7 +50,15 @@ export class HikChatView extends ItemView {
 		container.empty();
 		container.addClass('hik-chat-container');
 
+		this.registerEvent(
+			this.app.workspace.on('file-open', (file) => {
+				if (file) this.lastActiveFile = file;
+			}),
+		);
+		this.lastActiveFile = this.app.workspace.getActiveFile();
+
 		this.chatHistoryEl = container.createDiv({ cls: 'hik-chat-history' });
+		this.contextChipsEl = container.createDiv({ cls: 'hik-context-chips' });
 		this.inputContainerEl = container.createDiv({
 			cls: 'hik-input-container',
 		});
@@ -51,9 +68,10 @@ export class HikChatView extends ItemView {
 			attr: { title: 'Add current note to context' },
 		});
 		this.addContextBtnEl.innerHTML = '📎';
-		this.addContextBtnEl.addEventListener('click', () =>
-			this.addNoteContext(),
-		);
+		this.addContextBtnEl.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			this.addNoteContext();
+		});
 
 		this.textareaEl = this.inputContainerEl.createEl('textarea', {
 			cls: 'hik-textarea',
@@ -65,41 +83,104 @@ export class HikChatView extends ItemView {
 			text: 'Send',
 		});
 
-		this.sendBtnEl.addEventListener('click', () => this.sendMessage());
+		this.sendBtnEl.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			this.sendMessage();
+		});
+
 		this.textareaEl.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
 				this.sendMessage();
 			}
 		});
+
+		this.renderContextChips();
 	}
 
-	private async addNoteContext() {
+	private renderContextChips() {
+		this.contextChipsEl.empty();
+		if (this.contextFiles.length === 0) {
+			this.contextChipsEl.style.display = 'none';
+			return;
+		}
+		this.contextChipsEl.style.display = 'flex';
+
+		for (const ctx of this.contextFiles) {
+			const chip = this.contextChipsEl.createDiv({
+				cls: 'hik-context-chip',
+			});
+			chip.createSpan({ cls: 'hik-chip-icon', text: '📄' });
+			chip.createSpan({ cls: 'hik-chip-name', text: ctx.file.name });
+
+			const removeBtn = chip.createEl('button', {
+				cls: 'hik-chip-remove',
+				attr: { title: 'Remove from context' },
+			});
+			removeBtn.innerHTML = '×';
+			removeBtn.addEventListener('mousedown', (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				this.removeContextFile(ctx.file);
+			});
+		}
+	}
+
+	private addNoteContext() {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
 			new Notice('No active file open.');
 			return;
 		}
 
-		const content = await this.app.vault.read(activeFile);
-		const contextPrompt = `\n\n---\n**Context from current note (${activeFile.name}):**\n\`\`\`markdown\n${content}\n\`\`\`\n`;
+		if (this.contextFiles.some((c) => c.file.path === activeFile.path)) {
+			new Notice(`"${activeFile.name}" is already in context.`);
+			return;
+		}
 
-		this.textareaEl.value += contextPrompt;
-		this.textareaEl.focus();
-		new Notice(`Added "${activeFile.name}" to context`);
+		this.app.vault.read(activeFile).then((content) => {
+			this.contextFiles.push({ file: activeFile, content });
+
+			if (!this.contextProvidedFile) {
+				this.contextProvidedFile = activeFile;
+			}
+
+			this.renderContextChips();
+		});
+	}
+
+	private removeContextFile(file: TFile) {
+		this.contextFiles = this.contextFiles.filter(
+			(c) => c.file.path !== file.path,
+		);
+		if (this.contextProvidedFile?.path === file.path) {
+			this.contextProvidedFile = this.contextFiles[0]?.file || null;
+		}
+		this.renderContextChips();
 	}
 
 	private async sendMessage() {
-		const content = this.textareaEl.value.trim();
-		if (!content || this.isStreaming) return;
+		const userText = this.textareaEl.value.trim();
+		if (!userText || this.isStreaming) return;
 
 		if (!this.plugin.settings.apiKey) {
 			new Notice('Please set your Hik API Key in settings.');
 			return;
 		}
 
-		this.addMessageToUI('user', content);
-		this.messages.push({ role: 'user', content });
+		let fullContent = userText;
+		if (this.contextFiles.length > 0) {
+			const contextBlock = this.contextFiles
+				.map(
+					(c) =>
+						`---\n**Context from ${c.file.name}:**\n\`\`\`markdown\n${c.content}\n\`\`\``,
+				)
+				.join('\n\n');
+			fullContent = `${contextBlock}\n\n---\n\n**User Question:**\n${userText}`;
+		}
+
+		this.addMessageToUI('user', userText);
+		this.messages.push({ role: 'user', content: fullContent });
 		this.textareaEl.value = '';
 
 		this.isStreaming = true;
@@ -107,17 +188,14 @@ export class HikChatView extends ItemView {
 		this.addContextBtnEl.disabled = true;
 		this.lastAssistantResponse = '';
 
-		const { msgEl, textEl } = this.addMessageToUI('assistant', '');
+		const { textEl, msgEl } = this.addMessageToUI('assistant', '');
+		this.currentAssistantTextEl = textEl;
 		this.currentAssistantMsgEl = msgEl;
-		this.currentAssistantTextEl = textEl; // Save direct reference!
 
-		const insertBtn = this.currentAssistantMsgEl.createEl('button', {
-			cls: 'hik-insert-btn',
-			text: '📝 Insert to Note',
+		this.insertBtnsContainerEl = msgEl.createDiv({
+			cls: 'hik-insert-btns',
 		});
-		insertBtn.addEventListener('click', () =>
-			this.insertToActiveNote(this.lastAssistantResponse),
-		);
+		this.insertBtnsContainerEl.style.display = 'none';
 
 		await streamChat(
 			this.plugin.settings,
@@ -137,9 +215,8 @@ export class HikChatView extends ItemView {
 					role: 'assistant',
 					content: this.lastAssistantResponse,
 				});
-				new Notice(
-					`Done! Tokens: ${usage.promptTokens + usage.completionTokens}`,
-				);
+
+				this.showInsertButtons();
 			},
 			(error) => {
 				this.isStreaming = false;
@@ -151,24 +228,70 @@ export class HikChatView extends ItemView {
 		);
 	}
 
-	private insertToActiveNote(text: string) {
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView || !activeView.editor) {
-			new Notice('No markdown file is currently active.');
+	private showInsertButtons() {
+		this.insertBtnsContainerEl.empty();
+		this.insertBtnsContainerEl.style.display = 'flex';
+
+		// Button for current active note
+		const insertCurrentBtn = this.insertBtnsContainerEl.createEl('button', {
+			cls: 'hik-insert-btn',
+			text: '📝',
+			attr: { title: 'Insert to current active note' },
+		});
+		insertCurrentBtn.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			this.insertToNote(this.lastAssistantResponse, this.lastActiveFile);
+		});
+
+		// Button for context file (if one exists)
+		if (this.contextProvidedFile) {
+			const insertContextBtn = this.insertBtnsContainerEl.createEl(
+				'button',
+				{
+					cls: 'hik-insert-btn hik-insert-btn-alt',
+					text: '📄',
+					attr: {
+						title: `Insert to ${this.contextProvidedFile.name}`,
+					},
+				},
+			);
+			insertContextBtn.addEventListener('mousedown', (e) => {
+				e.preventDefault();
+				this.insertToNote(
+					this.lastAssistantResponse,
+					this.contextProvidedFile,
+				);
+			});
+		}
+	}
+
+	private async insertToNote(text: string, targetFile: TFile | null) {
+		if (!targetFile) {
+			new Notice('No target file available.');
 			return;
 		}
 
-		const editor = activeView.editor;
-		const cursor = editor.getCursor();
-		editor.replaceRange(text + '\n\n', cursor);
-		new Notice('Inserted into note!');
+		try {
+			const currentContent = await this.app.vault.read(targetFile);
+			await this.app.vault.modify(
+				targetFile,
+				currentContent + '\n\n' + text,
+			);
+			new Notice(`Inserted into "${targetFile.name}"!`);
+
+			const leaf = this.app.workspace.getLeaf(false);
+			await leaf.openFile(targetFile);
+		} catch (err) {
+			new Notice(`Failed to insert: ${(err as Error).message}`);
+		}
 	}
 
 	private addMessageToUI(role: 'user' | 'assistant', content: string) {
 		const msgEl = this.chatHistoryEl.createDiv({
 			cls: `hik-message hik-message-${role}`,
 		});
-		const textEl = msgEl.createSpan({ text: content });
+		const textEl = msgEl.createDiv({ cls: 'hik-message-text' });
+		textEl.textContent = content;
 		this.scrollToBottom();
 		return { msgEl, textEl };
 	}
