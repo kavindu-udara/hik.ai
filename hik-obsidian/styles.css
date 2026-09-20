@@ -1,0 +1,63 @@
+.hik-chat-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 10px;
+}
+
+.hik-chat-history {
+	flex: 1;
+	overflow-y: auto;
+	margin-bottom: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.hik-message {
+	padding: 10px;
+	border-radius: 8px;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+.hik-message-user {
+	background-color: var(--background-modifier-active-hover);
+	align-self: flex-end;
+	max-width: 85%;
+}
+
+.hik-message-assistant {
+	background-color: var(--background-primary-alt);
+	align-self: flex-start;
+	max-width: 85%;
+}
+
+.hik-input-container {
+	display: flex;
+	gap: 8px;
+}
+
+.hik-textarea {
+	flex: 1;
+	resize: none;
+	padding: 8px;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+}
+
+.hik-send-btn {
+	padding: 8px 16px;
+	border-radius: 6px;
+	border: none;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	cursor: pointer;
+}
+
+.hik-send-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
