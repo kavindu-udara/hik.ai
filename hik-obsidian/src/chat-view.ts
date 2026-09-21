@@ -1,7 +1,15 @@
-import { ItemView, WorkspaceLeaf, Notice, MarkdownView, TFile } from 'obsidian';
+import {
+	ItemView,
+	WorkspaceLeaf,
+	Notice,
+	MarkdownView,
+	TFile,
+	setIcon,
+} from 'obsidian';
 import HikPlugin from './main';
 import { streamChat, ChatMessage } from './api';
 import { v4 as uuidv4 } from 'uuid';
+import { VIEW_TYPE_HIK_SESSIONS } from './sessions-view';
 
 export const VIEW_TYPE_HIK_CHAT = 'hik-chat-view';
 
@@ -57,17 +65,25 @@ export class HikChatView extends ItemView {
 		);
 		this.lastActiveFile = this.app.workspace.getActiveFile();
 
+		// Top Navigation Bar
+		this.renderTopNav(container);
+
+		// Chat History Area
 		this.chatHistoryEl = container.createDiv({ cls: 'hik-chat-history' });
+
+		// Context Chips Area
 		this.contextChipsEl = container.createDiv({ cls: 'hik-context-chips' });
+
+		// Input Area
 		this.inputContainerEl = container.createDiv({
 			cls: 'hik-input-container',
 		});
 
 		this.addContextBtnEl = this.inputContainerEl.createEl('button', {
 			cls: 'hik-icon-btn',
-			attr: { title: 'Add current note to context' },
+			attr: { title: 'Attach current note' },
 		});
-		this.addContextBtnEl.innerHTML = '📎';
+		setIcon(this.addContextBtnEl, 'paperclip');
 		this.addContextBtnEl.addEventListener('mousedown', (e) => {
 			e.preventDefault();
 			this.addNoteContext();
@@ -80,9 +96,9 @@ export class HikChatView extends ItemView {
 
 		this.sendBtnEl = this.inputContainerEl.createEl('button', {
 			cls: 'hik-send-btn',
-			text: 'Send',
+			attr: { title: 'Send message' },
 		});
-
+		setIcon(this.sendBtnEl, 'arrow-up');
 		this.sendBtnEl.addEventListener('mousedown', (e) => {
 			e.preventDefault();
 			this.sendMessage();
@@ -96,6 +112,80 @@ export class HikChatView extends ItemView {
 		});
 
 		this.renderContextChips();
+	}
+
+	private renderTopNav(container: HTMLElement) {
+		const navBar = container.createDiv({ cls: 'hik-top-nav' });
+
+		// Left side: Logo/Title
+		const titleEl = navBar.createDiv({ cls: 'hik-nav-title' });
+		const logoIcon = titleEl.createSpan({ cls: 'hik-nav-logo' });
+		setIcon(logoIcon, 'bot');
+		titleEl.createSpan({ text: 'Hik', cls: 'hik-nav-title-text' });
+
+		// Right side: Action buttons
+		const actionsEl = navBar.createDiv({ cls: 'hik-nav-actions' });
+
+		// New Chat button
+		const newChatBtn = actionsEl.createEl('button', {
+			cls: 'hik-nav-btn',
+			attr: { title: 'New Chat' },
+		});
+		setIcon(newChatBtn, 'plus');
+		newChatBtn.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			this.startNewChat();
+		});
+
+		// History button
+		const historyBtn = actionsEl.createEl('button', {
+			cls: 'hik-nav-btn',
+			attr: { title: 'Chat History' },
+		});
+		setIcon(historyBtn, 'history');
+		historyBtn.addEventListener('mousedown', (e) => {
+			e.preventDefault();
+			this.openHistory();
+		});
+	}
+
+	private startNewChat() {
+		if (this.isStreaming) {
+			new Notice('Cannot start new chat while streaming.');
+			return;
+		}
+
+		this.sessionId = uuidv4();
+		this.messages = [];
+		this.contextFiles = [];
+		this.contextProvidedFile = null;
+		this.lastAssistantResponse = '';
+
+		this.chatHistoryEl.empty();
+		this.renderContextChips();
+
+		new Notice('Started new chat');
+	}
+
+	private async openHistory() {
+		const { workspace } = this.app;
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_HIK_SESSIONS);
+
+		let leaf: WorkspaceLeaf | null = leaves.length > 0 ? leaves[0]! : null;
+
+		if (!leaf) {
+			leaf = workspace.getRightLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({
+					type: VIEW_TYPE_HIK_SESSIONS,
+					active: true,
+				});
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
 	}
 
 	private renderContextChips() {
