@@ -5,6 +5,17 @@ export interface ChatMessage {
 	content: string;
 }
 
+export interface Session {
+	id: string;
+	title: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface SessionWithMessages extends Session {
+	messages: ChatMessage[];
+}
+
 export async function streamChat(
 	settings: HikSettings,
 	sessionId: string,
@@ -68,4 +79,40 @@ export async function streamChat(
 	} catch (error: any) {
 		onError(error.message);
 	}
+}
+
+export async function fetchSessions(settings: HikSettings): Promise<Session[]> {
+	const response = await fetch(`${settings.baseUrl}/api/v1/sessions`, {
+		headers: {
+			'x-api-key': settings.apiKey,
+		},
+	});
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch sessions: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	return data.sessions;
+}
+
+export async function fetchSession(
+	settings: HikSettings,
+	sessionId: string,
+): Promise<SessionWithMessages> {
+	const response = await fetch(
+		`${settings.baseUrl}/api/v1/sessions/${sessionId}`,
+		{
+			headers: {
+				'x-api-key': settings.apiKey,
+			},
+		},
+	);
+
+	if (!response.ok) {
+		throw new Error(`Failed to fetch session: ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	return data;
 }
