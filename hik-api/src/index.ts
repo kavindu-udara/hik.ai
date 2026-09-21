@@ -9,6 +9,7 @@ import authRoute from './routes/auth';
 import apiKeyRoute from './routes/api-keys';
 import settingsRoute from './routes/settings';
 import ChatRoute from './routes/chat';
+import sessionsRoute from './routes/sessions';
 
 const app = new Hono();
 
@@ -23,5 +24,6 @@ app.route('/api/v1/auth', authRoute);
 app.route('/api/v1/api-keys', apiKeyRoute);
 app.route('/api/v1/settings', settingsRoute);
 app.route('/api/v1/chat', ChatRoute);
+app.route('/api/v1/sessions', sessionsRoute);
 
 export default app;

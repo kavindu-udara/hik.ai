@@ -192,3 +192,89 @@
 	margin-left: 4px;
 	opacity: 0.9;
 }
+
+/* Session History Styles */
+.hik-sessions-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 10px;
+}
+
+.hik-sessions-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 15px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.hik-sessions-header h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.hik-refresh-btn {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	font-size: 16px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	transition: background 0.2s;
+}
+
+.hik-refresh-btn:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.hik-sessions-list {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.hik-session-item {
+	padding: 12px;
+	background-color: var(--background-primary-alt);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.hik-session-item:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.hik-session-title {
+	font-weight: 500;
+	margin-bottom: 4px;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hik-session-date {
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.hik-loading,
+.hik-empty-state,
+.hik-error-state {
+	padding: 20px;
+	text-align: center;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.hik-error-state {
+	color: var(--text-error);
+}

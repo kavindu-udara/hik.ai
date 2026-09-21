@@ -299,4 +299,22 @@ export class HikChatView extends ItemView {
 	private scrollToBottom() {
 		this.chatHistoryEl.scrollTop = this.chatHistoryEl.scrollHeight;
 	}
+
+	public loadSessionFromHistory(sessionData: any) {
+		this.sessionId = sessionData.session.id;
+		this.messages = sessionData.messages;
+		this.contextFiles = []; // Clear context for history view
+		this.contextProvidedFile = null;
+
+		// Clear the UI
+		this.chatHistoryEl.empty();
+		this.renderContextChips();
+
+		// Render all messages from history
+		for (const msg of this.messages) {
+			this.addMessageToUI(msg.role as 'user' | 'assistant', msg.content);
+		}
+
+		new Notice(`Loaded session: ${sessionData.session.title}`);
+	}
 }
