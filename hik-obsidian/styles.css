@@ -278,3 +278,243 @@
 .hik-error-state {
 	color: var(--text-error);
 }
+
+/* Top Navigation Bar */
+.hik-top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.hik-nav-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+.hik-nav-logo {
+  display: flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.hik-nav-logo svg {
+  width: 18px;
+  height: 18px;
+}
+
+.hik-nav-title-text {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-normal);
+}
+
+.hik-nav-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.hik-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.hik-nav-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hik-nav-btn:active {
+  background-color: var(--background-modifier-active-hover);
+}
+
+.hik-nav-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Update Send Button to match icon style */
+.hik-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 6px;
+  border: none;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.hik-send-btn:hover {
+  opacity: 0.9;
+}
+
+.hik-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hik-send-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Update Context Button */
+.hik-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.hik-icon-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.hik-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hik-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Sessions Header */
+.hik-sessions-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.hik-sessions-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-normal);
+}
+
+.hik-sessions-title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--interactive-accent);
+}
+
+/* Session Item Improvements */
+.hik-session-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--background-primary-alt);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hik-session-item:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.hik-session-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hik-session-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.hik-session-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hik-session-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hik-session-item-right {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.hik-session-item-right svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Loading/Empty/Error States with Icons */
+.hik-loading,
+.hik-empty-state,
+.hik-error-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.hik-error-state {
+  color: var(--text-error);
+}
+
+.hik-loading svg,
+.hik-empty-state svg,
+.hik-error-state svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
