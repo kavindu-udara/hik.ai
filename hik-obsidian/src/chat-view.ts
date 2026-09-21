@@ -5,6 +5,7 @@ import {
 	MarkdownView,
 	TFile,
 	setIcon,
+	MarkdownRenderer,
 } from 'obsidian';
 import HikPlugin from './main';
 import { streamChat, ChatMessage } from './api';
@@ -48,7 +49,7 @@ export class HikChatView extends ItemView {
 	private textareaEl!: HTMLTextAreaElement;
 	private sendBtnEl!: HTMLButtonElement;
 	private addContextBtnEl!: HTMLButtonElement;
-	private currentAssistantTextEl!: HTMLElement;
+	private currentAssistantContentEl!: HTMLElement;
 	private currentAssistantMsgEl!: HTMLElement;
 	private insertBtnsContainerEl!: HTMLElement;
 	private lastAssistantResponse: string = '';
@@ -278,8 +279,8 @@ export class HikChatView extends ItemView {
 		this.addContextBtnEl.disabled = true;
 		this.lastAssistantResponse = '';
 
-		const { textEl, msgEl } = this.addMessageToUI('assistant', '');
-		this.currentAssistantTextEl = textEl;
+		const { contentEl, msgEl } = this.addMessageToUI('assistant', '');
+		this.currentAssistantContentEl = contentEl;
 		this.currentAssistantMsgEl = msgEl;
 
 		this.insertBtnsContainerEl = msgEl.createDiv({
@@ -293,8 +294,15 @@ export class HikChatView extends ItemView {
 			this.messages,
 			(chunk) => {
 				this.lastAssistantResponse += chunk;
-				this.currentAssistantTextEl.textContent =
-					this.lastAssistantResponse;
+
+				// 🌟 Update plain text during stream for maximum performance
+				const plainTextEl =
+					this.currentAssistantContentEl.querySelector(
+						'.hik-markdown-content',
+					);
+				if (plainTextEl) {
+					plainTextEl.textContent = this.lastAssistantResponse;
+				}
 				this.scrollToBottom();
 			},
 			(usage) => {
@@ -306,13 +314,22 @@ export class HikChatView extends ItemView {
 					content: this.lastAssistantResponse,
 				});
 
+				// 🌟 NEW: Render the final Markdown once streaming is complete!
+				this.renderAssistantMarkdown();
+
 				this.showInsertButtons();
 			},
 			(error) => {
 				this.isStreaming = false;
 				this.sendBtnEl.disabled = false;
 				this.addContextBtnEl.disabled = false;
-				this.currentAssistantTextEl.textContent += `\n\n[Error: ${error}]`;
+				const plainTextEl =
+					this.currentAssistantContentEl.querySelector(
+						'.hik-markdown-content',
+					);
+				if (plainTextEl) {
+					plainTextEl.textContent += `\n\n[Error: ${error}]`;
+				}
 				new Notice(`Hik Error: ${error}`, 0);
 			},
 		);
@@ -380,31 +397,82 @@ export class HikChatView extends ItemView {
 		const msgEl = this.chatHistoryEl.createDiv({
 			cls: `hik-message hik-message-${role}`,
 		});
-		const textEl = msgEl.createDiv({ cls: 'hik-message-text' });
-		textEl.textContent = content;
+
+		// Create a container for the content
+		const contentEl = msgEl.createDiv({ cls: 'hik-message-content' });
+
+		if (role === 'user') {
+			// User messages stay as clean plain text
+			contentEl.createEl('pre', { text: content, cls: 'hik-plain-text' });
+		} else {
+			// Assistant messages start as plain text (for streaming performance)
+			contentEl.createEl('div', {
+				cls: 'hik-markdown-content',
+				text: content,
+			});
+		}
+
 		this.scrollToBottom();
-		return { msgEl, textEl };
+		return { msgEl, contentEl };
 	}
 
 	private scrollToBottom() {
 		this.chatHistoryEl.scrollTop = this.chatHistoryEl.scrollHeight;
 	}
 
-	public loadSessionFromHistory(sessionData: any) {
+	public async loadSessionFromHistory(sessionData: any) {
 		this.sessionId = sessionData.session.id;
 		this.messages = sessionData.messages;
-		this.contextFiles = []; // Clear context for history view
+		this.contextFiles = [];
 		this.contextProvidedFile = null;
+		this.lastAssistantResponse = '';
 
-		// Clear the UI
 		this.chatHistoryEl.empty();
 		this.renderContextChips();
 
 		// Render all messages from history
 		for (const msg of this.messages) {
-			this.addMessageToUI(msg.role as 'user' | 'assistant', msg.content);
+			const { contentEl } = this.addMessageToUI(
+				msg.role as 'user' | 'assistant',
+				msg.content,
+			);
+
+			// If it's an assistant message, render it as markdown immediately
+			if (msg.role === 'assistant') {
+				const markdownEl = contentEl.createDiv({
+					cls: 'hik-markdown-rendered',
+				});
+				await MarkdownRenderer.renderMarkdown(
+					msg.content,
+					markdownEl,
+					'',
+					this,
+				);
+			}
 		}
 
 		new Notice(`Loaded session: ${sessionData.session.title}`);
+	}
+
+	private async renderAssistantMarkdown() {
+		const contentEl = this.currentAssistantContentEl;
+		if (!contentEl) return;
+
+		// Clear the plain text container
+		contentEl.empty();
+
+		// Create a new div for the rendered markdown
+		const markdownEl = contentEl.createDiv({
+			cls: 'hik-markdown-rendered',
+		});
+
+		// Use Obsidian's built-in MarkdownRenderer
+		// 'this' works because ItemView extends Component, which MarkdownRenderer requires
+		await MarkdownRenderer.renderMarkdown(
+			this.lastAssistantResponse,
+			markdownEl,
+			'', // source path (empty is fine for generated text)
+			this,
+		);
 	}
 }
