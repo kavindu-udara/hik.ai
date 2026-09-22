@@ -9,16 +9,16 @@ import {
   LogOut,
   MessageSquare,
   Settings,
+  History as HistoryIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/router";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/sessions", label: "History", icon: History },
+  { href: "/dashboard/sessions", label: "History", icon: HistoryIcon },
   { href: "/dashboard/api-keys", label: "API Keys", icon: Key },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
