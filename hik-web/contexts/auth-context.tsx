@@ -1,3 +1,4 @@
+"use client"
 import { api, User } from "@/lib/api";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
