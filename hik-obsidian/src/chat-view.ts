@@ -11,6 +11,7 @@ import HikPlugin from './main';
 import { streamChat, ChatMessage } from './api';
 import { v4 as uuidv4 } from 'uuid';
 import { VIEW_TYPE_HIK_SESSIONS } from './sessions-view';
+import { SlashCommand, SlashCommandMenu } from './slash-commands';
 
 export const VIEW_TYPE_HIK_CHAT = 'hik-chat-view';
 
@@ -53,6 +54,7 @@ export class HikChatView extends ItemView {
 	private currentAssistantMsgEl!: HTMLElement;
 	private insertBtnsContainerEl!: HTMLElement;
 	private lastAssistantResponse: string = '';
+	private slashMenu!: SlashCommandMenu;
 
 	async onOpen() {
 		const container = this.containerEl.children[1] as HTMLElement;
@@ -95,6 +97,10 @@ export class HikChatView extends ItemView {
 			attr: { placeholder: 'Ask Hik anything...', rows: 3 },
 		});
 
+		this.slashMenu = new SlashCommandMenu(this.inputContainerEl, (cmd) => {
+			this.executeSlashCommand(cmd);
+		});
+
 		this.sendBtnEl = this.inputContainerEl.createEl('button', {
 			cls: 'hik-send-btn',
 			attr: { title: 'Send message' },
@@ -105,10 +111,46 @@ export class HikChatView extends ItemView {
 			this.sendMessage();
 		});
 
+		// Update the textarea keydown handler:
 		this.textareaEl.addEventListener('keydown', (e) => {
+			if (
+				this.slashMenu &&
+				this.slashMenu['menuEl'].style.display === 'block'
+			) {
+				if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					this.slashMenu.selectNext();
+					return;
+				}
+				if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					this.slashMenu.selectPrev();
+					return;
+				}
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					this.slashMenu.selectCurrent();
+					return;
+				}
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					this.slashMenu.hide();
+					return;
+				}
+			}
+
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
 				this.sendMessage();
+			}
+		});
+
+		this.textareaEl.addEventListener('input', () => {
+			const value = this.textareaEl.value;
+			if (value.startsWith('/')) {
+				this.slashMenu.show(value);
+			} else {
+				this.slashMenu.hide();
 			}
 		});
 
@@ -281,28 +323,42 @@ export class HikChatView extends ItemView {
 
 		const { contentEl, msgEl } = this.addMessageToUI('assistant', '');
 		this.currentAssistantContentEl = contentEl;
-		this.currentAssistantMsgEl = msgEl;
+
+		// ✅ NEW: Show loading animation
+		const loadingEl = contentEl.createDiv({ cls: 'hik-loading-dots' });
+		loadingEl.createDiv({ cls: 'dot' });
+		loadingEl.createDiv({ cls: 'dot' });
+		loadingEl.createDiv({ cls: 'dot' });
 
 		this.insertBtnsContainerEl = msgEl.createDiv({
 			cls: 'hik-insert-btns',
 		});
 		this.insertBtnsContainerEl.style.display = 'none';
 
+		let hasReceivedFirstChunk = false;
+
 		await streamChat(
 			this.plugin.settings,
 			this.sessionId,
 			this.messages,
 			(chunk) => {
+				if (!hasReceivedFirstChunk) {
+					loadingEl.remove();
+					hasReceivedFirstChunk = true;
+				}
+
 				this.lastAssistantResponse += chunk;
 
-				// 🌟 Update plain text during stream for maximum performance
-				const plainTextEl =
-					this.currentAssistantContentEl.querySelector(
-						'.hik-markdown-content',
-					);
-				if (plainTextEl) {
-					plainTextEl.textContent = this.lastAssistantResponse;
+				let plainTextEl = contentEl.querySelector(
+					'.hik-markdown-content',
+				) as HTMLElement;
+				if (!plainTextEl) {
+					plainTextEl = contentEl.createEl('div', {
+						cls: 'hik-markdown-content',
+					});
 				}
+
+				plainTextEl.textContent = this.lastAssistantResponse;
 				this.scrollToBottom();
 			},
 			(usage) => {
@@ -314,22 +370,24 @@ export class HikChatView extends ItemView {
 					content: this.lastAssistantResponse,
 				});
 
-				// 🌟 NEW: Render the final Markdown once streaming is complete!
 				this.renderAssistantMarkdown();
-
 				this.showInsertButtons();
 			},
 			(error) => {
 				this.isStreaming = false;
 				this.sendBtnEl.disabled = false;
 				this.addContextBtnEl.disabled = false;
-				const plainTextEl =
-					this.currentAssistantContentEl.querySelector(
-						'.hik-markdown-content',
-					);
-				if (plainTextEl) {
-					plainTextEl.textContent += `\n\n[Error: ${error}]`;
+				loadingEl.remove();
+
+				let plainTextEl = contentEl.querySelector(
+					'.hik-markdown-content',
+				) as HTMLElement;
+				if (!plainTextEl) {
+					plainTextEl = contentEl.createEl('div', {
+						cls: 'hik-markdown-content',
+					});
 				}
+				plainTextEl.textContent = `[Error: ${error}]`;
 				new Notice(`Hik Error: ${error}`, 0);
 			},
 		);
@@ -474,5 +532,66 @@ export class HikChatView extends ItemView {
 			'', // source path (empty is fine for generated text)
 			this,
 		);
+	}
+
+	private async executeSlashCommand(command: SlashCommand) {
+		this.slashMenu.hide();
+		this.textareaEl.value = '';
+
+		const activeFile = this.app.workspace.getActiveFile();
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+		let content = '';
+		let prompt = '';
+
+		// Get selected text or full note content
+		if (activeView && activeView.editor) {
+			const selection = activeView.editor.getSelection();
+			if (selection) {
+				content = selection;
+			} else if (activeFile) {
+				content = await this.app.vault.read(activeFile);
+			}
+		} else if (activeFile) {
+			content = await this.app.vault.read(activeFile);
+		}
+
+		if (!content) {
+			new Notice('No content to process. Open a note or select text.');
+			return;
+		}
+
+		// Build prompt based on command
+		switch (command.id) {
+			case 'summarize':
+				prompt = `Please summarize the following content concisely:\n\n${content}`;
+				break;
+			case 'explain':
+				prompt = `Please explain the following content in simple terms:\n\n${content}`;
+				break;
+			case 'fix':
+				prompt = `Please fix any errors and improve the following content:\n\n${content}`;
+				break;
+			case 'translate':
+				prompt = `Please translate the following content to English:\n\n${content}`;
+				break;
+			default:
+				return;
+		}
+
+		// Add context file if attached
+		if (this.contextFiles.length > 0) {
+			const contextBlock = this.contextFiles
+				.map(
+					(c) =>
+						`---\n**Context from ${c.file.name}:**\n\`\`\`markdown\n${c.content}\n\`\`\``,
+				)
+				.join('\n\n');
+			prompt = `${contextBlock}\n\n---\n\n${prompt}`;
+		}
+
+		// Set the textarea and send
+		this.textareaEl.value = prompt;
+		this.sendMessage();
 	}
 }
