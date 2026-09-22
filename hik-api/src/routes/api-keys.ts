@@ -3,6 +3,7 @@ import { generateApiKey, hashApiKey, verifyJWT } from "../lib/auth";
 import z from "zod";
 import { db } from "../db";
 import { apiKeys } from "../db/schema";
+import { and, eq } from "drizzle-orm";
 
 const apiKeyRoute = new Hono();
 
@@ -66,6 +67,33 @@ apiKeyRoute.post("/", async (c) => {
     },
     201,
   );
+});
+
+apiKeyRoute.get("/", async (c) => {
+  const userId = c.get("userId");
+
+  const keys = await db.query.apiKeys.findMany({
+    where: eq(apiKeys.userId, userId),
+    columns: { id: true, name: true, createdAt: true },
+  });
+
+  return c.json({ keys });
+});
+
+apiKeyRoute.delete("/:keyId", async (c) => {
+  const userId = c.get("userId");
+  const keyId = c.req.param("keyId");
+
+  const key = await db.query.apiKeys.findFirst({
+    where: and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)),
+  });
+
+  if (!key) {
+    return c.json({ error: "Key not found" }, 404);
+  }
+
+  await db.delete(apiKeys).where(eq(apiKeys.id, keyId));
+  return c.json({ message: "Key deleted" });
 });
 
 export default apiKeyRoute;
