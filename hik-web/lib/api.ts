@@ -128,9 +128,7 @@ class ApiClient {
   }
 
   // Usage (requires API key)
-  async getUsage(
-    apiKey: string,
-  ): Promise<{
+  async getUsage(apiKey: string): Promise<{
     logs: UsageLog[];
     total: { inputTokens: number; outputTokens: number };
   }> {
@@ -139,6 +137,18 @@ class ApiClient {
     });
     if (!response.ok) throw new Error("Failed to fetch usage");
     return response.json();
+  }
+
+  // Dashboard Sessions (requires JWT)
+  async listDashboardSessions(): Promise<{ sessions: Session[] }> {
+    return this.request("/api/v1/dashboard/sessions");
+  }
+
+  async getDashboardSession(sessionId: string): Promise<{
+    session: Session;
+    messages: Message[];
+  }> {
+    return this.request(`/api/v1/dashboard/sessions/${sessionId}`);
   }
 }
 

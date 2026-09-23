@@ -11,6 +11,7 @@ import settingsRoute from "./routes/settings";
 import ChatRoute from "./routes/chat";
 import sessionsRoute from "./routes/sessions";
 import usageRoute from "./routes/usage";
+import dashboardSessionsRoute from "./routes/dashboard-sessions";
 
 const app = new Hono();
 
@@ -34,5 +35,6 @@ app.route("/api/v1/settings", settingsRoute);
 app.route("/api/v1/chat", ChatRoute);
 app.route("/api/v1/sessions", sessionsRoute);
 app.route("/api/v1/usage", usageRoute);
+app.route("/api/v1/dashboard/sessions", dashboardSessionsRoute);
 
 export default app;
