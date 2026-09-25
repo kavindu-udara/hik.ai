@@ -184,6 +184,27 @@ class ApiClient {
   }> {
     return this.request("/api/v1/dashboard/settings/usage");
   }
+
+  async getOverview(): Promise<{
+    totalSessions: number;
+    totalTokens: { input: number; output: number; total: number };
+    totalRequests: number;
+    activeProviders: string[];
+    apiKeysCount: number;
+    recentSessions: Array<{
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    user: {
+      email: string;
+      plan: string;
+      createdAt: string;
+    };
+  }> {
+    return this.request("/api/v1/dashboard/overview");
+  }
 }
 
 export const api = new ApiClient();
