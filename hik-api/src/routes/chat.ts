@@ -4,7 +4,7 @@ import { streamText } from "ai";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import { hashApiKey } from "../lib/auth";
+import { hashApiKey, verifyJWT } from "../lib/auth";
 import { db } from "../db";
 import { and, eq } from "drizzle-orm";
 import {
@@ -30,37 +30,43 @@ const chatSchema = z.object({
 });
 
 ChatRoute.post("/", async (c) => {
-  // Authenticate via API key
-  const apiKeyHeader =
-    c.req.header("x-api-key") ||
-    c.req.header("Authorization")?.replace("Bearer ", "");
+  // Flexible Authentication (API key or JWT)
+  const authHeader = c.req.header("Authorization") || c.req.header("x-api-key");
 
-  if (!apiKeyHeader || !apiKeyHeader.startsWith("hik_")) {
-    return c.json({ error: "Unauthorized: Valid x-api-key required" }, 401);
+  let userId: string;
+  let userPlan: string;
+
+  if (authHeader?.startsWith("hik_")) {
+    // API Key Authentication
+    const hashedInput = hashApiKey(authHeader);
+    const dbKey = await db.query.apiKeys.findFirst({
+      where: eq(apiKeys.keyHash, hashedInput),
+    });
+
+    if (!dbKey) {
+      return c.json({ error: "Unauthorized: Invalid API key" }, 401);
+    }
+
+    userId = dbKey.userId;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    userPlan = user?.plan || "free";
+  } else if (authHeader?.startsWith("Bearer ")) {
+    // JWT Authentication
+    const token = authHeader.split(" ")[1];
+    const payload = await verifyJWT(token);
+
+    if (!payload) return c.json({ error: "Unauthorized: Invalid JWT" }, 401);
+
+    userId = payload.userId;
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    userPlan = user?.plan || "free";
+  } else {
+    return c.json({ error: "Unauthorized: Missing valid authentication" }, 401);
   }
-
-  // Hash the provided key to query the database
-  const hashedInput = await hashApiKey(apiKeyHeader);
-
-  const dbKey = await db.query.apiKeys.findFirst({
-    where: eq(apiKeys.keyHash, hashedInput),
-  });
-
-  if (!dbKey) {
-    return c.json({ error: "Unauthorized: Invalid API key" }, 401);
-  }
-
-  // Fetch the user separately
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, dbKey.userId),
-  });
-
-  if (!user) {
-    return c.json({ error: "Unauthorized: User not found" }, 401);
-  }
-
-  const userId = dbKey.userId;
-  const userPlan = user.plan;
 
   // Validate request body
   const body = await c.req.json();
