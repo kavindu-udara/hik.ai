@@ -52,7 +52,9 @@ dashboardOverviewRoute.get("/", async (c) => {
     columns: { provider: true },
   });
 
-  const activeProviders = [...new Set(recentUsage.map((log) => log.provider))];
+  const activeProviders = Array.from(
+    new Set(recentUsage.map((log) => log.provider)),
+  );
 
   // Get API keys count
   const apiKeysCount = await db
