@@ -29,7 +29,7 @@ dashboardSettingsRoute.get("/keys", async (c) => {
 
   const keys = await db.query.userProviderKeys.findMany({
     where: eq(userProviderKeys.userId, userId),
-    columns: { id: true, provider: true, createdAt: true, updatedAt: true },
+    columns: { id: true, provider: true },
   });
 
   return c.json({ keys });
@@ -60,7 +60,7 @@ dashboardSettingsRoute.post("/keys", async (c) => {
     // Update existing key
     await db
       .update(userProviderKeys)
-      .set({ encryptedKey: apiKey, updatedAt: new Date() })
+      .set({ encryptedKey: apiKey })
       .where(eq(userProviderKeys.id, existing.id));
   } else {
     // Insert new key
