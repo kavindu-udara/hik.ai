@@ -127,18 +127,6 @@ class ApiClient {
     return response.json();
   }
 
-  // Usage (requires API key)
-  async getUsage(apiKey: string): Promise<{
-    logs: UsageLog[];
-    total: { inputTokens: number; outputTokens: number };
-  }> {
-    const response = await fetch(`${API_URL}/api/v1/usage`, {
-      headers: { "x-api-key": apiKey },
-    });
-    if (!response.ok) throw new Error("Failed to fetch usage");
-    return response.json();
-  }
-
   // Dashboard Sessions (requires JWT)
   async listDashboardSessions(): Promise<{ sessions: Session[] }> {
     return this.request("/api/v1/dashboard/sessions");
@@ -149,6 +137,52 @@ class ApiClient {
     messages: Message[];
   }> {
     return this.request(`/api/v1/dashboard/sessions/${sessionId}`);
+  }
+
+  // Dashboard Settings (requires JWT)
+  async listProviderKeys(): Promise<{
+    keys: Array<{
+      id: string;
+      provider: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }> {
+    return this.request("/api/v1/dashboard/settings/keys");
+  }
+
+  async saveProviderKey(
+    provider: string,
+    apiKey: string,
+  ): Promise<{ message: string }> {
+    return this.request("/api/v1/dashboard/settings/keys", {
+      method: "POST",
+      body: JSON.stringify({ provider, apiKey }),
+    });
+  }
+
+  async deleteProviderKey(provider: string): Promise<{ message: string }> {
+    return this.request(`/api/v1/dashboard/settings/keys/${provider}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getUsage(): Promise<{
+    logs: Array<{
+      id: string;
+      provider: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      createdAt: string;
+    }>;
+    totals: { inputTokens: number; outputTokens: number; totalTokens: number };
+    byProvider: Record<
+      string,
+      { inputTokens: number; outputTokens: number; requests: number }
+    >;
+  }> {
+    return this.request("/api/v1/dashboard/settings/usage");
   }
 }
 
