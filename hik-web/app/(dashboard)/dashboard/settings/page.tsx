@@ -349,8 +349,8 @@ export default function SettingsPage() {
                                                     cx="50%"
                                                     cy="50%"
                                                     labelLine={false}
-                                                    label={({ provider, percent }) =>
-                                                        `${provider} ${(percent * 100).toFixed(0)}%`
+                                                    label={({ payload, percent }) =>
+                                                        `${payload?.provider ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
                                                     }
                                                     outerRadius={80}
                                                     fill="hsl(var(--chart-1))"
