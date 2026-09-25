@@ -1,0 +1,83 @@
+# .github/workflows/ci.yml
+name: CI - Code Quality & Build
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+jobs:
+  # ---------------------------------------------------------
+  # Job 1: Check Hik API
+  # ---------------------------------------------------------
+  check-api:
+    name: Check API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd hik-api && bun install --frozen-lockfile
+
+      - name: Type Check
+        run: cd hik-api && bun run typecheck 
+        # Note: If you don't have a "typecheck" script, use: bunx tsc --noEmit
+
+      - name: Build Check
+        run: cd hik-api && bun run build
+        # Note: Ensures the backend compiles successfully
+
+  # ---------------------------------------------------------
+  # Job 2: Check Obsidian Plugin
+  # ---------------------------------------------------------
+  check-obsidian:
+    name: Check Obsidian Plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd hik-obsidian && bun install --frozen-lockfile
+
+      - name: Build & Type Check
+        run: cd hik-obsidian && bun run build
+        # Your build script already includes `tsc --noEmit`, so this covers both!
+
+  # ---------------------------------------------------------
+  # Job 3: Check Web Dashboard
+  # ---------------------------------------------------------
+  check-web:
+    name: Check Web Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd hik-web && bun install --frozen-lockfile
+
+      - name: Type Check
+        run: cd hik-web && bunx tsc --noEmit
+
+      - name: Build Check
+        run: cd hik-web && bun run build
