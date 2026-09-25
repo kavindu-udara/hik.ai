@@ -73,16 +73,17 @@ dashboardOverviewRoute.get("/", async (c) => {
   });
 
   return c.json({
-    totalSessions: totalSessions[0]?.count || 0,
+    totalSessions: Number(totalSessions[0]?.count || 0),
     totalTokens: {
-      input: usageStats[0]?.inputTokens || 0,
-      output: usageStats[0]?.outputTokens || 0,
+      input: Number(usageStats[0]?.inputTokens || 0),
+      output: Number(usageStats[0]?.outputTokens || 0),
       total:
-        (usageStats[0]?.inputTokens || 0) + (usageStats[0]?.outputTokens || 0),
+        Number(usageStats[0]?.inputTokens || 0) +
+        Number(usageStats[0]?.outputTokens || 0),
     },
-    totalRequests: usageStats[0]?.totalRequests || 0,
+    totalRequests: Number(usageStats[0]?.totalRequests || 0),
     activeProviders,
-    apiKeysCount: apiKeysCount[0]?.count || 0,
+    apiKeysCount: Number(apiKeysCount[0]?.count || 0),
     recentSessions,
     user: {
       email: user?.email,
