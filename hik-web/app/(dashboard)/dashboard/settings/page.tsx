@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { Key, MessageSquare, Plus, Trash2, TrendingUp, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 interface ProviderKey {
@@ -118,6 +119,35 @@ export default function SettingsPage() {
         return num.toLocaleString();
     };
 
+    // Prepare data for usage over time chart
+    const prepareUsageOverTime = (logs: UsageLog[]) => {
+        const dailyUsage: Record<string, { date: string; inputTokens: number; outputTokens: number }> = {};
+
+        logs.forEach((log) => {
+            const date = new Date(log.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+            });
+
+            if (!dailyUsage[date]) {
+                dailyUsage[date] = { date, inputTokens: 0, outputTokens: 0 };
+            }
+
+            dailyUsage[date].inputTokens += log.inputTokens;
+            dailyUsage[date].outputTokens += log.outputTokens;
+        });
+
+        return Object.values(dailyUsage).reverse().slice(0, 14); // Last 14 days
+    };
+
+    // Prepare data for provider pie chart
+    const prepareProviderData = (byProvider: Record<string, { inputTokens: number; outputTokens: number; requests: number }>) => {
+        return Object.entries(byProvider).map(([provider, data]) => ({
+            provider,
+            tokens: data.inputTokens + data.outputTokens,
+        }));
+    };
+
     return (
         <div className="p-8">
             <div className="mb-8">
@@ -223,6 +253,7 @@ export default function SettingsPage() {
                                         </p>
                                     </CardContent>
                                 </Card>
+
                                 <Card>
                                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                                         <CardTitle className="text-sm font-medium">Providers Used</CardTitle>
@@ -237,6 +268,7 @@ export default function SettingsPage() {
                                         </p>
                                     </CardContent>
                                 </Card>
+
                                 <Card>
                                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                                         <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
@@ -255,37 +287,119 @@ export default function SettingsPage() {
                                     </CardContent>
                                 </Card>
                             </div>
-                            {/* Provider Breakdown */}
+
+                            {/* 🆕 Token Usage Over Time Chart */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Usage by Provider</CardTitle>
+                                    <CardTitle>Token Usage Over Time</CardTitle>
                                     <CardDescription>
-                                        Breakdown of token usage across different AI providers
+                                        Daily token consumption across all providers
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-4">
-                                        {Object.entries(usage.byProvider).map(([provider, data]) => (
-                                            <div key={provider} className="flex items-center justify-between p-4 border rounded-lg">
-                                                <div>
-                                                    <div className="font-medium capitalize">{provider}</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {data.requests} requests
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="font-medium">
-                                                        {formatNumber(data.inputTokens + data.outputTokens)} tokens
-                                                    </div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {formatNumber(data.inputTokens)} in / {formatNumber(data.outputTokens)} out
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <AreaChart data={prepareUsageOverTime(usage.logs)}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="date" className="text-xs" />
+                                            <YAxis className="text-xs" />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: "hsl(var(--popover))",
+                                                    border: "1px solid hsl(var(--border))",
+                                                    borderRadius: "6px",
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="inputTokens"
+                                                stackId="1"
+                                                stroke="hsl(var(--chart-1))"
+                                                fill="hsl(var(--chart-1))"
+                                                fillOpacity={0.6}
+                                                name="Input Tokens"
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="outputTokens"
+                                                stackId="1"
+                                                stroke="hsl(var(--chart-2))"
+                                                fill="hsl(var(--chart-2))"
+                                                fillOpacity={0.6}
+                                                name="Output Tokens"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
                                 </CardContent>
                             </Card>
+
+                            {/* 🆕 Provider Breakdown Chart */}
+                            <div className="grid gap-6 md:grid-cols-2">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Usage by Provider</CardTitle>
+                                        <CardDescription>
+                                            Token distribution across AI providers
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ResponsiveContainer width="100%" height={300}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={prepareProviderData(usage.byProvider)}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    labelLine={false}
+                                                    label={({ payload, percent }) =>
+                                                        `${payload?.provider ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
+                                                    }
+                                                    outerRadius={80}
+                                                    fill="hsl(var(--chart-1))"
+                                                    dataKey="tokens"
+                                                >
+                                                    {prepareProviderData(usage.byProvider).map((entry, index) => (
+                                                        <Cell
+                                                            key={`cell-${index}`}
+                                                            fill={`hsl(var(--chart-${(index % 5) + 1}))`}
+                                                        />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Provider Breakdown</CardTitle>
+                                        <CardDescription>
+                                            Detailed usage statistics
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-4">
+                                            {Object.entries(usage.byProvider).map(([provider, data]) => (
+                                                <div key={provider} className="flex items-center justify-between p-4 border rounded-lg">
+                                                    <div>
+                                                        <div className="font-medium capitalize">{provider}</div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {data.requests} requests
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="font-medium">
+                                                            {formatNumber(data.inputTokens + data.outputTokens)} tokens
+                                                        </div>
+                                                        <div className="text-sm text-muted-foreground">
+                                                            {formatNumber(data.inputTokens)} in / {formatNumber(data.outputTokens)} out
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
                             {/* Recent Usage Logs */}
                             <Card>
