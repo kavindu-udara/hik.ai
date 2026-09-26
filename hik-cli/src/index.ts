@@ -4,7 +4,12 @@ import { execSync } from "node:child_process";
 import { Command } from "commander";
 import chalk from "chalk";
 import { saveConfig } from "./auth.js";
-import { explainCode, generateCommitMessage, streamChat } from "./chat.js";
+import {
+  explainCode,
+  fixIssue,
+  generateCommitMessage,
+  streamChat,
+} from "./chat.js";
 import pkg from "../package.json" with { type: "json" };
 import { getStagedDiff } from "./git.js";
 import { readFileContent } from "./fs.js";
@@ -116,6 +121,68 @@ program
 
       console.log(chalk.green("\n💡 Explanation:"));
       console.log(explanation);
+      console.log("\n");
+    } catch (error) {
+      console.error(chalk.red("[ERROR] Error:"), (error as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("fix")
+  .argument("[file]", "Path to the file containing the code or error log")
+  .description(
+    "Get a fix for an error message or buggy code. Can also read from stdin.",
+  )
+  .action(async (filePath) => {
+    try {
+      let input = "";
+      let contextType: "error" | "code" = "error";
+      let sourceName = "stdin";
+
+      // Check if data is being piped (e.g., cat error.log | hik fix)
+      if (process.stdin.isTTY) {
+        // If no file argument and not piped, ask for manual paste (MVP: just throw error for now)
+        if (!filePath) {
+          console.error(
+            chalk.red(
+              "[ERROR] Please provide a file path or pipe input. Example:",
+            ),
+          );
+          console.error(chalk.gray("   hik fix error.log"));
+          console.error(chalk.gray("   cat error.log | hik fix"));
+          console.error(chalk.gray("   hik fix src/broken-code.ts"));
+          process.exit(1);
+        }
+
+        // It's a file
+        input = readFileContent(filePath);
+        sourceName = filePath;
+
+        // Simple heuristic: if it looks like code, treat as code
+        if (filePath.match(/\.(ts|js|py|go|rs|java|cpp|c)$/)) {
+          contextType = "code";
+        }
+      } else {
+        // Reading from stdin
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk);
+        }
+        input = Buffer.concat(chunks).toString();
+        contextType = "error"; // Default piped input to error/log analysis
+      }
+
+      if (!input.trim()) {
+        console.error(chalk.red("[ERROR] No input provided."));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue(`🔍 Analyzing ${sourceName}...`));
+      const solution = await fixIssue(input, contextType, sourceName);
+
+      console.log(chalk.green("\n🛠️ Suggested Fix:"));
+      console.log(solution);
       console.log("\n");
     } catch (error) {
       console.error(chalk.red("[ERROR] Error:"), (error as Error).message);
