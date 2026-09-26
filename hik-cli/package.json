@@ -18,6 +18,7 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "commander": "^15.0.0",
     "node-fetch": "^3.3.2"
   }
 }
