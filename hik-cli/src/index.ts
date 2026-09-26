@@ -2,11 +2,13 @@
 
 import { execSync } from "node:child_process";
 import { Command } from "commander";
-import chalk from 'chalk';
+import chalk from "chalk";
 import { saveConfig } from "./auth.js";
-import { generateCommitMessage, streamChat } from "./chat.js";
+import { explainCode, generateCommitMessage, streamChat } from "./chat.js";
 import pkg from "../package.json" with { type: "json" };
 import { getStagedDiff } from "./git.js";
+import { readFileContent } from "./fs.js";
+import * as path from "path";
 
 const program = new Command();
 
@@ -88,10 +90,33 @@ program
         console.log(chalk.green("[SUCCESS] Committed successfully!"));
       } else {
         console.log(
-          chalk.gray("[INFO] To commit automatically next time, use: hik commit -y"),
+          chalk.gray(
+            "[INFO] To commit automatically next time, use: hik commit -y",
+          ),
         );
         console.log(chalk.gray(`[INFO] Or run: git commit -m "${message}"`));
       }
+    } catch (error) {
+      console.error(chalk.red("[ERROR] Error:"), (error as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("explain")
+  .argument("<file>", "Path to the file you want to explain")
+  .description("Explain the contents of a code file")
+  .action(async (filePath) => {
+    try {
+      console.log(chalk.blue(`[INFO] Reading ${filePath}...`));
+      const content = readFileContent(filePath);
+
+      console.log(chalk.blue("✨ Analyzing code..."));
+      const explanation = await explainCode(content, path.basename(filePath));
+
+      console.log(chalk.green("\n💡 Explanation:"));
+      console.log(explanation);
+      console.log("\n");
     } catch (error) {
       console.error(chalk.red("[ERROR] Error:"), (error as Error).message);
       process.exit(1);
