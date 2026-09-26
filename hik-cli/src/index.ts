@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Command } from 'commander';
 import { saveConfig } from './auth.js';
 import { streamChat } from './chat.js';
