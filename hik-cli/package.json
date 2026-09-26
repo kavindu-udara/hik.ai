@@ -16,5 +16,8 @@
   },
   "peerDependencies": {
     "typescript": "^7"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
