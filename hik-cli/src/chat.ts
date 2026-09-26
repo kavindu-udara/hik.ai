@@ -28,17 +28,15 @@ export async function streamChat(message: string, model?: string) {
     throw new Error(`API Error: ${err}`);
   }
 
-  const reader = response.body?.getReader();
   const decoder = new TextDecoder();
 
-  if (!reader) throw new Error("No response body");
+  if (!response.body) throw new Error("No response body");
 
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
+  for await (const chunk of response.body) {
+    buffer += typeof chunk === "string"
+      ? chunk
+      : decoder.decode(chunk, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
@@ -55,5 +53,7 @@ export async function streamChat(message: string, model?: string) {
       }
     }
   }
+
+  buffer += decoder.decode();
   console.log("\n"); // New line after stream ends
 }
