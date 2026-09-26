@@ -138,3 +138,34 @@ export async function explainCode(
     "qwen2.5-coder-7b-instruct",
   );
 }
+
+export async function fixIssue(
+  input: string,
+  contextType: "error" | "code",
+  fileName?: string,
+): Promise<string> {
+  let prompt = "";
+
+  if (contextType === "error") {
+    prompt = `You are an expert debugger. I am encountering the following error or issue. 
+    Please analyze it and provide:
+    1. A brief explanation of what is likely causing the error.
+    2. The corrected code or solution.
+    
+    Issue/Error:
+    ${input}`;
+  } else {
+    prompt = `You are an expert code reviewer. I have the following code in "${fileName || "a file"}" that needs fixing or improvement.
+    Please identify any bugs, performance issues, or bad practices and provide the corrected version.
+    
+    Code:
+    \`\`\`
+    ${input}
+    \`\`\``;
+  }
+
+  return fetchCompletion(
+    [{ role: "user", content: prompt }],
+    "qwen2.5-coder-7b-instruct",
+  );
+}
