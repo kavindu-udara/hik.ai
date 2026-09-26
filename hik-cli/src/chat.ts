@@ -115,3 +115,26 @@ export async function generateCommitMessage(diff: string): Promise<string> {
     "qwen2.5-coder-7b-instruct",
   );
 }
+
+export async function explainCode(
+  content: string,
+  fileName: string,
+): Promise<string> {
+  const prompt = `You are an expert developer. Please explain the following code from the file "${fileName}". 
+  Focus on:
+  1. What the code does at a high level.
+  2. Key functions or logic flows.
+  3. Any potential improvements or "gotchas".
+  
+  Keep the explanation concise and easy to understand.
+  
+  Code:
+  \`\`\`
+  ${content}
+  \`\`\``;
+
+  return fetchCompletion(
+    [{ role: "user", content: prompt }],
+    "qwen2.5-coder-7b-instruct",
+  );
+}
