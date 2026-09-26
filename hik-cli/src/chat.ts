@@ -34,9 +34,10 @@ export async function streamChat(message: string, model?: string) {
 
   let buffer = "";
   for await (const chunk of response.body) {
-    buffer += typeof chunk === "string"
-      ? chunk
-      : decoder.decode(chunk, { stream: true });
+    buffer +=
+      typeof chunk === "string"
+        ? chunk
+        : decoder.decode(chunk, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
@@ -56,4 +57,61 @@ export async function streamChat(message: string, model?: string) {
 
   buffer += decoder.decode();
   console.log("\n"); // New line after stream ends
+}
+
+async function fetchCompletion(
+  messages: any[],
+  model: string,
+): Promise<string> {
+  const apiKey = requireApiKey();
+  const config = getConfig();
+  const apiUrl = config.apiUrl || "http://localhost:3000";
+  const sessionId = crypto.randomUUID();
+
+  const response = await fetch(`${apiUrl}/api/v1/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sessionId,
+      messages,
+      model,
+    }),
+  });
+
+  if (!response.ok) throw new Error(await response.text());
+
+  const decoder = new TextDecoder();
+  let fullText = "";
+  let buffer = "";
+
+  if (response.body) {
+    for await (const chunk of response.body) {
+      buffer +=
+        typeof chunk === "string"
+          ? chunk
+          : decoder.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "text") fullText += data.content;
+          } catch {}
+        }
+      }
+    }
+  }
+  return fullText;
+}
+
+export async function generateCommitMessage(diff: string): Promise<string> {
+  const prompt = `Generate a conventional commit message for this diff. Only return the message, nothing else.\n\n${diff}`;
+  return fetchCompletion(
+    [{ role: "user", content: prompt }],
+    "qwen2.5-coder-7b-instruct",
+  );
 }
