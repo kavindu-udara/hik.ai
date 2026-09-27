@@ -18,9 +18,15 @@ import { startInteractiveChat } from "./interactive.js";
 const program = new Command();
 
 program
-  .name("hik")
-  .description("Your unified AI workspace CLI")
-  .version(pkg.version);
+  .name('hik')
+  .description(chalk.bold('Your unified AI workspace CLI'))
+  .version(pkg.version)
+  .addHelpText('after', `\n${chalk.dim('Examples:')}
+  ${chalk.cyan('$')} hik login hik_...
+  ${chalk.cyan('$')} hik commit -y
+  ${chalk.cyan('$')} hik explain src/app.ts
+  ${chalk.cyan('$')} hik interactive
+`);
 
 program
   .command("login")
