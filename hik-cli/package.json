@@ -1,5 +1,5 @@
 {
-  "name": "@kavindu-udara/hik-cli",
+  "name": "@udara-kavindu/hik-cli",
   "version": "0.1.0",
   "description": "Your unified AI workspace CLI",
   "module": "index.ts",
