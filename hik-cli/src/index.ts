@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-
+import { Command } from 'commander';
 import { execSync } from "node:child_process";
-import { Command } from "commander";
 import chalk from "chalk";
 import { saveConfig } from "./auth.js";
 import {
