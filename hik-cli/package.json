@@ -4,7 +4,6 @@
   "description": "Your unified AI workspace CLI",
   "module": "index.ts",
   "type": "module",
-  "private": true,
   "main": "dist/index.js",
   "scripts": {
     "dev": "bun run src/index.ts",
