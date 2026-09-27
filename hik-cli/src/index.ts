@@ -14,6 +14,7 @@ import pkg from "../package.json" with { type: "json" };
 import { getStagedDiff } from "./git.js";
 import { readFileContent } from "./fs.js";
 import * as path from "path";
+import { startInteractiveChat } from "./interactive.js";
 
 const program = new Command();
 
@@ -188,6 +189,14 @@ program
       console.error(chalk.red("[ERROR] Error:"), (error as Error).message);
       process.exit(1);
     }
+  });
+
+program
+  .command("interactive")
+  .alias("i")
+  .description("Start an interactive chat session")
+  .action(() => {
+    startInteractiveChat();
   });
 
 program.parse();
