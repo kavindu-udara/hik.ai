@@ -1,0 +1,36 @@
+services:
+  # ---------------------------------------------------------
+  # Hik API Service
+  # ---------------------------------------------------------
+  hik-api:
+    build:
+      context: ./hik-api
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./hik-api/.env.production # You'll create this next
+    restart: unless-stopped
+    networks:
+      - hik-network
+
+  # ---------------------------------------------------------
+  # Hik Web Dashboard
+  # ---------------------------------------------------------
+  hik-web:
+    build:
+      context: ./hik-web
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - hik-api
+    restart: unless-stopped
+    networks:
+      - hik-network
+
+networks:
+  hik-network:
+    driver: bridge
